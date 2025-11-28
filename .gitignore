@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+bi-tool-mobile.bundle
+public/bi-tool-mobile.bundle
 
 # debug
 npm-debug.log*
