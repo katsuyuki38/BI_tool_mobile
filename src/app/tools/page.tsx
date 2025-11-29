@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Toast } from "@/components/Toast";
+import { useMockAction } from "@/hooks/useMockAction";
 import { getRecents } from "@/lib/recents";
 
 const tools = [
@@ -49,7 +49,7 @@ export default function ToolsPage() {
       { label: "アドホック: 7日間 / Mobile（サンプル）", path: "/adhoc", at: now - 1000 * 60 * 20 },
     ];
   });
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const { trigger: triggerToast, ToastSlot } = useMockAction();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -135,7 +135,7 @@ export default function ToolsPage() {
             {["Slackへスナップショット", "CSVエクスポート", "アラート設定を開く"].map((action) => (
               <button
                 key={action}
-                onClick={() => setToast({ message: `${action}（モック）を実行しました`, type: "success" })}
+                onClick={() => triggerToast(`${action}（モック）を実行しました`)}
                 className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
               >
                 {action}
@@ -144,7 +144,7 @@ export default function ToolsPage() {
           </div>
         </section>
       </main>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {ToastSlot}
     </div>
   );
 }
