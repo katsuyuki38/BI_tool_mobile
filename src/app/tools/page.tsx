@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { getRecents } from "@/lib/recents";
 
 const tools = [
   {
@@ -31,9 +33,30 @@ const tools = [
   },
 ];
 
-const recents = ["ダッシュボード（売上・利用）", "アドホック分析: 7日間 / Mobile", "設定: Slack通知"];
+type RecentItem = {
+  label: string;
+  path: string;
+  at: number;
+};
 
 export default function ToolsPage() {
+  const [recents, setRecents] = useState<RecentItem[]>([]);
+
+  useEffect(() => {
+    setRecents(getRecents());
+  }, []);
+
+  const displayRecents = useMemo(
+    () =>
+      recents.length
+        ? recents
+        : [
+            { label: "ダッシュボード（サンプル）", path: "/", at: Date.now() - 1000 * 60 * 10 },
+            { label: "アドホック: 7日間 / Mobile（サンプル）", path: "/adhoc", at: Date.now() - 1000 * 60 * 20 },
+          ],
+    [recents],
+  );
+
   return (
     <div className="min-h-screen bg-slate-950">
       <main className="mx-auto flex max-w-5xl flex-col gap-6 px-5 py-8">
@@ -85,10 +108,15 @@ export default function ToolsPage() {
         <section className="space-y-2 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
           <h3 className="text-sm font-semibold text-white">最近使った</h3>
           <ul className="space-y-2 text-sm text-slate-200">
-            {recents.map((item) => (
-              <li key={item} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
-                <span>{item}</span>
-                <span className="text-xs text-emerald-200">再開</span>
+            {displayRecents.map((item) => (
+              <li key={item.path} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
+                <div>
+                  <div>{item.label}</div>
+                  <div className="text-[11px] text-slate-400">最終更新: {new Date(item.at).toLocaleString("ja-JP")}</div>
+                </div>
+                <Link href={item.path} className="text-xs text-emerald-200 underline underline-offset-4">
+                  再開
+                </Link>
               </li>
             ))}
           </ul>
