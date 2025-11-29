@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { StocksPanel } from "@/components/StocksPanel";
-import { Toast } from "@/components/Toast";
 import { FilterControls } from "@/components/FilterControls";
+import { Toast } from "@/components/Toast";
+import { useFilters } from "@/hooks/useFilters";
+import { useMockAction } from "@/hooks/useMockAction";
 import { addRecent } from "@/lib/recents";
 import type { StockSummary } from "@/types/stocks";
 
@@ -49,10 +51,10 @@ export default function Home() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState<string | null>(null);
-  const [period, setPeriod] = useState("30");
-  const [segment, setSegment] = useState("all");
+  const { period, segment, setPeriod, setSegment } = useFilters({ period: "30", segment: "all" });
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const { trigger: triggerMock, ToastSlot: MockToast } = useMockAction();
   const quickActions = [
     "Slackにスナップショット送信",
     "CSVエクスポート（期間フィルタ反映）",
@@ -82,11 +84,11 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(`Failed to share (${res.status})`);
       const data = (await res.json()) as { url: string; expiresAt: string };
-        setShareMsg(`共有リンクを発行しました: ${data.url} （有効期限: ${new Date(data.expiresAt).toLocaleString("ja-JP")}）`);
-      } catch (err) {
-        console.error(err);
-        setShareError("共有リンクの発行に失敗しました");
-      }
+      setShareMsg(`共有リンクを発行しました: ${data.url} （有効期限: ${new Date(data.expiresAt).toLocaleString("ja-JP")}）`);
+    } catch (err) {
+      console.error(err);
+      setShareError("共有リンクの発行に失敗しました");
+    }
   };
 
   const [stockData, setStockData] = useState<Record<string, StockSummary>>({});
@@ -204,6 +206,18 @@ export default function Home() {
                 className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/15 transition hover:-translate-y-0.5 hover:shadow-xl"
               >
                 {dashLoading ? "同期中…" : "データ同期"}
+              </button>
+              <button
+                onClick={() => triggerMock("Slackにスナップショット（モック）を送信しました")}
+                className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
+              >
+                Slack送信
+              </button>
+              <button
+                onClick={() => triggerMock("CSVエクスポート（モック）を開始しました")}
+                className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
+              >
+                CSVエクスポート
               </button>
               <button
                 onClick={handleShare}
@@ -422,6 +436,7 @@ export default function Home() {
       </main>
       {shareMsg && <Toast message={shareMsg} type="success" onClose={() => setShareMsg(null)} />}
       {shareError && <Toast message={shareError} type="error" onClose={() => setShareError(null)} />}
+      {MockToast}
     </div>
   );
 }
