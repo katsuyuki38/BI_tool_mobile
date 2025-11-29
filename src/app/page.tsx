@@ -7,17 +7,8 @@ import { FilterControls } from "@/components/FilterControls";
 import { Toast } from "@/components/Toast";
 import { useFilters } from "@/hooks/useFilters";
 import { useMockAction } from "@/hooks/useMockAction";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { addRecent } from "@/lib/recents";
-import type { StockSummary } from "@/types/stocks";
-
-type DashboardData = {
-  kpis: Array<{ title: string; value: string; change: string; status: string; bars: number[] }>;
-  traffic: number[];
-  segments: Array<{ name: string; share: number; lift: string }>;
-  activities: Array<{ title: string; value: string; detail: string; change: string }>;
-};
-
-const DASHBOARD_ENDPOINT = "/api/dashboard";
 const STOCK_SYMBOLS = ["AAPL", "MSFT", "GOOG", "SPY"];
 const periodOptions = [
   { label: "7d", value: "7" },
@@ -30,31 +21,19 @@ const segmentOptions = [
   { label: "Desktop", value: "desktop" },
 ];
 
-async function fetchDashboardWithParams(period: string, segment: string): Promise<DashboardData> {
-  const query = new URLSearchParams({ period, segment }).toString();
-  const res = await fetch(`${DASHBOARD_ENDPOINT}?${query}`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to load dashboard (${res.status})`);
-  }
-  return res.json();
-}
-
-async function fetchStockSummary(symbol: string): Promise<StockSummary> {
-  const res = await fetch(`/api/stocks?symbol=${symbol}&days=90`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to load stock ${symbol} (${res.status})`);
-  }
-  return res.json();
-}
-
 export default function Home() {
-  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [dashLoading, setDashLoading] = useState(true);
-  const [dashError, setDashError] = useState<string | null>(null);
   const { period, segment, setPeriod, setSegment } = useFilters({ period: "30", segment: "all" });
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const { trigger: triggerMock, ToastSlot: MockToast } = useMockAction();
+  const {
+    dashboard,
+    dashLoading,
+    dashError,
+    stockData,
+    stockLoading,
+    stockError,
+  } = useDashboardData(period, segment, STOCK_SYMBOLS);
   const quickActions = [
     "Slackにスナップショット送信",
     "CSVエクスポート（期間フィルタ反映）",
@@ -90,50 +69,6 @@ export default function Home() {
       setShareError("共有リンクの発行に失敗しました");
     }
   };
-
-  const [stockData, setStockData] = useState<Record<string, StockSummary>>({});
-  const [stockLoading, setStockLoading] = useState(true);
-  const [stockError, setStockError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setDashLoading(true);
-    fetchDashboardWithParams(period, segment)
-      .then((data) => {
-        if (!active) return;
-        setDashboard(data);
-        setDashError(null);
-      })
-      .catch((err) => {
-        console.error(err);
-        if (!active) return;
-        setDashError("ダッシュボードデータの取得に失敗しました");
-        setDashboard(null);
-      })
-      .finally(() => active && setDashLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [period, segment]);
-
-  useEffect(() => {
-    let active = true;
-    Promise.all(STOCK_SYMBOLS.map((symbol) => fetchStockSummary(symbol).then((data) => [symbol, data] as const)))
-      .then((entries) => {
-        if (!active) return;
-        setStockData(Object.fromEntries(entries));
-        setStockError(null);
-      })
-      .catch((err) => {
-        console.error(err);
-        if (!active) return;
-        setStockError("株価データの取得に失敗しました");
-      })
-      .finally(() => active && setStockLoading(false));
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     addRecent({ label: "ダッシュボード", path: "/", at: Date.now() });
