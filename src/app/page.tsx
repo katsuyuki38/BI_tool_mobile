@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { StocksPanel } from "@/components/StocksPanel";
+import { Toast } from "@/components/Toast";
+import { FilterControls } from "@/components/FilterControls";
 import { addRecent } from "@/lib/recents";
 import type { StockSummary } from "@/types/stocks";
 
@@ -80,11 +82,11 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(`Failed to share (${res.status})`);
       const data = (await res.json()) as { url: string; expiresAt: string };
-      setShareMsg(`共有リンクを発行しました: ${data.url} （有効期限: ${new Date(data.expiresAt).toLocaleString("ja-JP")}）`);
-    } catch (err) {
-      console.error(err);
-      setShareError("共有リンクの発行に失敗しました");
-    }
+        setShareMsg(`共有リンクを発行しました: ${data.url} （有効期限: ${new Date(data.expiresAt).toLocaleString("ja-JP")}）`);
+      } catch (err) {
+        console.error(err);
+        setShareError("共有リンクの発行に失敗しました");
+      }
   };
 
   const [stockData, setStockData] = useState<Record<string, StockSummary>>({});
@@ -218,35 +220,14 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {periodOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setPeriod(opt.value)}
-                className={`rounded-full border px-3 py-1 text-xs transition ${
-                  period === opt.value
-                    ? "border-emerald-300 bg-emerald-500/15 text-emerald-100"
-                    : "border-white/15 text-slate-200 hover:border-emerald-400/50"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-            {segmentOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setSegment(opt.value)}
-                className={`rounded-full border px-3 py-1 text-xs transition ${
-                  segment === opt.value
-                    ? "border-emerald-300 bg-emerald-500/15 text-emerald-100"
-                    : "border-white/15 text-slate-200 hover:border-emerald-400/50"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-            <button className="rounded-full border border-white/15 px-3 py-1 text-xs text-slate-200 transition hover:border-emerald-400/50">
-              Export
-            </button>
+            <FilterControls
+              periodOptions={periodOptions}
+              segmentOptions={segmentOptions}
+              period={period}
+              segment={segment}
+              onPeriodChange={setPeriod}
+              onSegmentChange={setSegment}
+            />
           </div>
         </section>
 
@@ -437,18 +418,10 @@ export default function Home() {
             株価データを取得中…
           </div>
         )}
-        {shareMsg && (
-          <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-            {shareMsg}
-          </div>
-        )}
-        {shareError && (
-          <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-            {shareError}
-          </div>
-        )}
         <StocksPanel symbols={STOCK_SYMBOLS} initialData={stockData} defaultRange={90} />
       </main>
+      {shareMsg && <Toast message={shareMsg} type="success" onClose={() => setShareMsg(null)} />}
+      {shareError && <Toast message={shareError} type="error" onClose={() => setShareError(null)} />}
     </div>
   );
 }

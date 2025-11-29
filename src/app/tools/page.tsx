@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { Toast } from "@/components/Toast";
 import { getRecents } from "@/lib/recents";
 
 const tools = [
@@ -41,21 +42,21 @@ type RecentItem = {
 
 export default function ToolsPage() {
   const [recents, setRecents] = useState<RecentItem[]>([]);
+  const [fallbackRecents] = useState<RecentItem[]>(() => {
+    const now = Date.now();
+    return [
+      { label: "ダッシュボード（サンプル）", path: "/", at: now - 1000 * 60 * 10 },
+      { label: "アドホック: 7日間 / Mobile（サンプル）", path: "/adhoc", at: now - 1000 * 60 * 20 },
+    ];
+  });
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecents(getRecents());
   }, []);
 
-  const displayRecents = useMemo(
-    () =>
-      recents.length
-        ? recents
-        : [
-            { label: "ダッシュボード（サンプル）", path: "/", at: Date.now() - 1000 * 60 * 10 },
-            { label: "アドホック: 7日間 / Mobile（サンプル）", path: "/adhoc", at: Date.now() - 1000 * 60 * 20 },
-          ],
-    [recents],
-  );
+  const displayRecents = recents.length ? recents : fallbackRecents;
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -134,6 +135,7 @@ export default function ToolsPage() {
             {["Slackへスナップショット", "CSVエクスポート", "アラート設定を開く"].map((action) => (
               <button
                 key={action}
+                onClick={() => setToast({ message: `${action}（モック）を実行しました`, type: "success" })}
                 className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
               >
                 {action}
@@ -142,6 +144,7 @@ export default function ToolsPage() {
           </div>
         </section>
       </main>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
