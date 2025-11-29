@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StockSummary } from "@/types/stocks";
 
 type DashboardData = {
@@ -36,11 +36,20 @@ export function useDashboardData(period: string, segment: string, symbols: strin
   const [stockLoading, setStockLoading] = useState(true);
   const [stockError, setStockError] = useState<string | null>(null);
 
+  const cacheKey = useMemo(() => `${period}_${segment}`, [period, segment]);
+  const [cache, setCache] = useState<Record<string, DashboardData>>({});
+
   const refetchDashboard = useCallback(async () => {
     setDashLoading(true);
     try {
+      if (cache[cacheKey]) {
+        setDashboard(cache[cacheKey]);
+        setDashLoading(false);
+        return;
+      }
       const data = await fetchDashboard(period, segment);
       setDashboard(data);
+      setCache((prev) => ({ ...prev, [cacheKey]: data }));
       setDashError(null);
     } catch (err) {
       console.error(err);
@@ -49,7 +58,7 @@ export function useDashboardData(period: string, segment: string, symbols: strin
     } finally {
       setDashLoading(false);
     }
-  }, [period, segment]);
+  }, [cache, cacheKey, period, segment]);
 
   const refetchStocks = useCallback(async () => {
     setStockLoading(true);
