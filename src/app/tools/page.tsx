@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useMockAction } from "@/hooks/useMockAction";
+import { useActionLogger } from "@/hooks/useActionLogger";
 import { getRecents } from "@/lib/recents";
 
 const tools = [
@@ -50,6 +51,7 @@ export default function ToolsPage() {
     ];
   });
   const { trigger: triggerToast, ToastSlot } = useMockAction();
+  const { log } = useActionLogger();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -135,7 +137,18 @@ export default function ToolsPage() {
             {["Slackへスナップショット", "CSVエクスポート", "アラート設定を開く"].map((action) => (
               <button
                 key={action}
-                onClick={() => triggerToast(`${action}（モック）を実行しました`)}
+                onClick={async () => {
+                  triggerToast(`${action}（モック）を実行しました`);
+                  if (action.startsWith("Slack")) {
+                    await fetch("/api/notify/slack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: "/tools" }) });
+                    log({ action: "slack_snapshot", detail: { path: "/tools" } });
+                  } else if (action.startsWith("CSV")) {
+                    await fetch("/api/export/csv", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period: "30", segment: "all" }) });
+                    log({ action: "csv_export", detail: { period: "30", segment: "all" } });
+                  } else {
+                    log({ action: "open_alert_settings" });
+                  }
+                }}
                 className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
               >
                 {action}

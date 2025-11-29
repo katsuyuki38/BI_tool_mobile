@@ -8,6 +8,7 @@ import { Toast } from "@/components/Toast";
 import { useFilters } from "@/hooks/useFilters";
 import { useMockAction } from "@/hooks/useMockAction";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useActionLogger } from "@/hooks/useActionLogger";
 import { addRecent } from "@/lib/recents";
 const STOCK_SYMBOLS = ["AAPL", "MSFT", "GOOG", "SPY"];
 const periodOptions = [
@@ -26,6 +27,7 @@ export default function Home() {
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const { trigger: triggerMock, ToastSlot: MockToast } = useMockAction();
+  const { log } = useActionLogger();
   const {
     dashboard,
     dashLoading,
@@ -143,13 +145,29 @@ export default function Home() {
                 {dashLoading ? "同期中…" : "データ同期"}
               </button>
               <button
-                onClick={() => triggerMock("Slackにスナップショット（モック）を送信しました")}
+                onClick={async () => {
+                  triggerMock("Slackにスナップショット（モック）を送信しました");
+                  await fetch("/api/notify/slack", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ path: "/" }),
+                  });
+                  log({ action: "slack_snapshot", detail: { path: "/" } });
+                }}
                 className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
               >
                 Slack送信
               </button>
               <button
-                onClick={() => triggerMock("CSVエクスポート（モック）を開始しました")}
+                onClick={async () => {
+                  triggerMock("CSVエクスポート（モック）を開始しました");
+                  await fetch("/api/export/csv", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ period, segment }),
+                  });
+                  log({ action: "csv_export", detail: { period, segment } });
+                }}
                 className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
               >
                 CSVエクスポート
