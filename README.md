@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BIモバイルツール（Next.js）
 
-## Getting Started
+営業/CS/マネージャー向けのモバイルBIビュー（モック実装中）。
 
-First, run the development server:
-
+## 開発起動
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev -- --hostname 0.0.0.0 --port 3010
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## トンネル（リモート確認）
+- Cloudflare Quick Tunnel  
+  ```bash
+  cloudflared tunnel --url http://127.0.0.1:3010 --no-autoupdate --protocol http2 --edge-ip-version auto
+  ```  
+  `/tmp/cloudflared-3010.log` にURLが出力。終了は `pkill -f cloudflared`。  
+- 直近URL（毎回変わるので要更新）：`https://wise-reward-steady-feels.trycloudflare.com`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 主要ルート
+- `/login`：メール＋ワンタイムコード（モック）。コードは常に `123456`。成功で `/tools` へ。
+- `/tools`：ハブ。ダッシュボード/アドホック/運用/設定へ。
+- `/`：ダッシュボード。期間/セグメント切替、共有リンク発行（モック）、クイックアクション、インサイト。
+- `/adhoc`：期間・ディメンション切替のモック集計。
+- `/ops` `/settings`：プレースホルダ。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## モックAPI
+- `/api/dashboard`：`?period=7|30|90` `?segment=all|mobile|desktop`
+- `/api/adhoc`：`?period=7|30|90` `?dimension=channel|device|region`
+- `/api/stocks`：`?symbol=AAPL|MSFT|GOOG|SPY`
+- `/api/auth/mock`：モック認証
+- `/api/share`：共有リンクダミー発行
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 開発メモ
+- ローカル「最近使った」を `localStorage` に保存（ハブで利用予定）。
+- 共有/通知はモック。実装時はエンドポイントを差し替える。

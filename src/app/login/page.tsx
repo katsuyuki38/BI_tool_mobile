@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const features = [
   "スマホ最適化ビューで主要KPIを即確認",
@@ -6,7 +11,120 @@ const features = [
   "ダッシュボード・アドホック分析・設定へワンタップ遷移",
 ];
 
+type AuthAction = "send-code" | "login";
+
+type AuthResponse =
+  | { status: "sent"; message: string; codeHint: string }
+  | { status: "ok"; message: string; trusted: boolean; sessionExpiry: number }
+  | { status: "error"; message: string };
+
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState<AuthAction | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [codeHint, setCodeHint] = useState<string | null>(null);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+
+  const emailOk = useMemo(() => isValidEmail(email.trim()), [email]);
+  const codeOk = useMemo(() => /^[0-9]{6}$/.test(code.trim()), [code]);
+
+  const callMockAuth = async (action: AuthAction) => {
+    setBusy(action);
+    setInfo(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/mock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code, action }),
+      });
+      const data = (await res.json()) as AuthResponse;
+
+      if (!res.ok || data.status === "error") {
+        setError(data.message || "エラーが発生しました");
+        return;
+      }
+
+      if (data.status === "sent") {
+        setCodeHint(data.codeHint);
+        setInfo(data.message);
+      }
+
+      if (data.status === "ok") {
+        setInfo(`${data.message}（セッション30分有効）`);
+        try {
+          localStorage.setItem(
+            "bi-mobile-session",
+            JSON.stringify({ email, sessionExpiry: data.sessionExpiry }),
+          );
+          setSessionEmail(email);
+        } catch (storageError) {
+          console.error(storageError);
+        }
+        setTimeout(() => router.push("/tools"), 400);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("ネットワークまたはサーバーエラーが発生しました");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleSendCode = () => {
+    if (!emailOk) {
+      setError("メール形式を確認してください");
+      return;
+    }
+    callMockAuth("send-code");
+  };
+
+  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!emailOk) {
+      setError("メール形式を確認してください");
+      return;
+    }
+    if (!codeOk) {
+      setError("6桁のコードを入力してください");
+      return;
+    }
+    callMockAuth("login");
+  };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("bi-mobile-session");
+      if (!raw) return;
+      const session = JSON.parse(raw) as { email?: string; sessionExpiry?: number };
+      if (session.sessionExpiry && session.sessionExpiry > Date.now()) {
+        setSessionEmail(session.email ?? null);
+        setInfo("既にサインイン済みです。ハブに移動します。");
+        setTimeout(() => router.push("/tools"), 400);
+      } else {
+        localStorage.removeItem("bi-mobile-session");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("bi-mobile-session");
+      setSessionEmail(null);
+      setInfo("セッションをクリアしました。再度サインインしてください。");
+    } catch (err) {
+      console.error(err);
+      setError("ログアウト処理に失敗しました");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950">
       <main className="mx-auto flex max-w-xl flex-col gap-8 px-5 py-8">
@@ -23,13 +141,16 @@ export default function LoginPage() {
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_25px_80px_-35px_rgba(0,0,0,0.8)] backdrop-blur">
-          <div className="space-y-3">
+          <form className="space-y-3" onSubmit={handleLogin}>
             <div>
               <label className="text-sm font-semibold text-white">メールアドレス</label>
               <input
                 type="email"
                 placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="mt-2 w-full rounded-2xl border border-white/15 bg-slate-900/60 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+                autoComplete="email"
               />
             </div>
             <div>
@@ -37,15 +158,34 @@ export default function LoginPage() {
               <input
                 type="text"
                 placeholder="6桁コード"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
                 className="mt-2 w-full rounded-2xl border border-white/15 bg-slate-900/60 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none"
+                inputMode="numeric"
+                autoComplete="one-time-code"
               />
-              <div className="mt-2 text-xs text-slate-400">コード未取得の場合は「コードを送信」を押してください。</div>
+              <div className="mt-2 text-xs text-slate-400">
+                コード未取得の場合は「コードを送信」を押してください。モック環境では {codeHint ?? "123456"} が常に有効です。
+              </div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <button className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/15 transition hover:-translate-y-0.5 hover:shadow-xl sm:w-auto">
+              <button
+                type="button"
+                onClick={handleSendCode}
+                disabled={busy !== null}
+                className={`w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/15 transition hover:-translate-y-0.5 hover:shadow-xl sm:w-auto ${
+                  busy ? "opacity-70" : ""
+                }`}
+              >
                 コードを送信
               </button>
-              <button className="w-full rounded-2xl border border-emerald-400/60 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:text-white sm:w-auto">
+              <button
+                type="submit"
+                disabled={busy !== null}
+                className={`w-full rounded-2xl border border-emerald-400/60 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:text-white sm:w-auto ${
+                  busy ? "opacity-70" : ""
+                }`}
+              >
                 ログインして続行
               </button>
             </div>
@@ -60,7 +200,34 @@ export default function LoginPage() {
             >
               サインイン後のハブを見る
             </Link>
-          </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+              <span>
+                {sessionEmail ? `現在のモックセッション: ${sessionEmail}` : "未サインイン"}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
+              >
+                セッションをクリア
+              </button>
+            </div>
+            {error && (
+              <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                {error}
+              </div>
+            )}
+            {info && (
+              <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                {info}
+              </div>
+            )}
+            {busy && (
+              <div className="text-xs text-slate-400">
+                {busy === "send-code" ? "コード送信中…" : "ログイン処理中…"}
+              </div>
+            )}
+          </form>
         </section>
 
         <section className="space-y-2 rounded-3xl border border-white/10 bg-slate-900/50 p-5 backdrop-blur">
