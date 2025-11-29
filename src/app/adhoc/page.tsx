@@ -1,20 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-
-type AdhocRow = { label: string; sessions: number; revenue: number; cvr: number };
-type AdhocResponse = {
-  period: string;
-  dimension: string;
-  summary: Array<{ label: string; value: string; change: string }>;
-  rows: AdhocRow[];
-};
+import { useMemo, useState } from "react";
+import { FilterControls } from "@/components/FilterControls";
+import { useAdhocData } from "@/hooks/useAdhocData";
+import { useFilters } from "@/hooks/useFilters";
+import { useActionLogger } from "@/hooks/useActionLogger";
+import { addRecent } from "@/lib/recents";
 
 const periodOptions = [
-  { label: "7日間", value: "7" },
-  { label: "30日間", value: "30" },
-  { label: "90日間", value: "90" },
+  { label: "7d", value: "7" },
+  { label: "30d", value: "30" },
+  { label: "90d", value: "90" },
 ];
 
 const dimensionOptions = [
@@ -23,43 +20,15 @@ const dimensionOptions = [
   { label: "エリア", value: "region" },
 ];
 
-const fetchAdhoc = async (period: string, dimension: string): Promise<AdhocResponse> => {
-  const query = new URLSearchParams({ period, dimension }).toString();
-  const res = await fetch(`/api/adhoc?${query}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to load adhoc data (${res.status})`);
-  return res.json();
-};
-
 export default function AdhocPage() {
-  const [period, setPeriod] = useState("30");
+  const { period, segment, setPeriod, setSegment } = useFilters({ period: "30", segment: "all" });
   const [dimension, setDimension] = useState("channel");
-  const [data, setData] = useState<AdhocResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    fetchAdhoc(period, dimension)
-      .then((res) => {
-        if (!active) return;
-        setData(res);
-        setError(null);
-      })
-      .catch((err) => {
-        console.error(err);
-        if (!active) return;
-        setError("アドホックデータの取得に失敗しました");
-        setData(null);
-      })
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [period, dimension]);
-
+  const { data, error, loading } = useAdhocData(period, dimension);
+  const { log } = useActionLogger();
   const isEmpty = useMemo(() => data && data.rows.length === 0, [data]);
+  useEffect(() => {
+    addRecent({ label: "アドホック分析", path: "/adhoc", at: Date.now() });
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -86,28 +55,34 @@ export default function AdhocPage() {
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
           <h2 className="text-sm font-semibold text-white">期間プリセット</h2>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            {periodOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setPeriod(opt.value)}
-                className={`rounded-full border px-3 py-1 transition ${
-                  period === opt.value
-                    ? "border-emerald-300 bg-emerald-500/15 text-emerald-100"
-                    : "border-white/15 text-slate-200 hover:border-emerald-400/50"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <FilterControls
+            periodOptions={periodOptions}
+            segmentOptions={[
+              { label: "All", value: "all" },
+              { label: "Mobile", value: "mobile" },
+              { label: "Desktop", value: "desktop" },
+            ]}
+            period={period}
+            segment={segment}
+            onPeriodChange={(value) => {
+              setPeriod(value);
+              log({ action: "adhoc_period_change", detail: { value } });
+            }}
+            onSegmentChange={(value) => {
+              setSegment(value);
+              log({ action: "adhoc_segment_change", detail: { value } });
+            }}
+          />
 
           <h3 className="mt-4 text-sm font-semibold text-white">ディメンション</h3>
           <div className="mt-2 flex flex-wrap gap-2 text-xs">
             {dimensionOptions.map((opt) => (
               <button
                 key={opt.value}
-                onClick={() => setDimension(opt.value)}
+                onClick={() => {
+                  setDimension(opt.value);
+                  log({ action: "adhoc_dimension_change", detail: { value: opt.value } });
+                }}
                 className={`rounded-full border px-3 py-1 transition ${
                   dimension === opt.value
                     ? "border-emerald-300 bg-emerald-500/15 text-emerald-100"

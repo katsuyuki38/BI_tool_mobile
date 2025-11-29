@@ -1,5 +1,6 @@
 "use client";
 
+import useSWR from "swr";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StockSummary } from "@/types/stocks";
 
@@ -12,12 +13,11 @@ type DashboardData = {
 
 const DASHBOARD_ENDPOINT = "/api/dashboard";
 
-async function fetchDashboard(period: string, segment: string): Promise<DashboardData> {
-  const query = new URLSearchParams({ period, segment }).toString();
-  const res = await fetch(`${DASHBOARD_ENDPOINT}?${query}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to load dashboard (${res.status})`);
-  return res.json();
-}
+const fetcher = (url: string) =>
+  fetch(url, { cache: "no-store" }).then((res) => {
+    if (!res.ok) throw new Error(`Failed to load dashboard (${res.status})`);
+    return res.json() as Promise<DashboardData>;
+  });
 
 async function fetchStockSummary(symbol: string): Promise<StockSummary> {
   const res = await fetch(`/api/stocks?symbol=${symbol}&days=90`, { cache: "no-store" });
@@ -36,29 +36,14 @@ export function useDashboardData(period: string, segment: string, symbols: strin
   const [stockLoading, setStockLoading] = useState(true);
   const [stockError, setStockError] = useState<string | null>(null);
 
-  const cacheKey = useMemo(() => `${period}_${segment}`, [period, segment]);
-  const [cache, setCache] = useState<Record<string, DashboardData>>({});
-
-  const refetchDashboard = useCallback(async () => {
-    setDashLoading(true);
-    try {
-      if (cache[cacheKey]) {
-        setDashboard(cache[cacheKey]);
-        setDashLoading(false);
-        return;
-      }
-      const data = await fetchDashboard(period, segment);
-      setDashboard(data);
-      setCache((prev) => ({ ...prev, [cacheKey]: data }));
-      setDashError(null);
-    } catch (err) {
-      console.error(err);
-      setDashError("ダッシュボードデータの取得に失敗しました");
-      setDashboard(null);
-    } finally {
-      setDashLoading(false);
-    }
-  }, [cache, cacheKey, period, segment]);
+  const cacheKey = useMemo(
+    () => `${DASHBOARD_ENDPOINT}?${new URLSearchParams({ period, segment }).toString()}`,
+    [period, segment],
+  );
+  const { data, isLoading, error, mutate } = useSWR<DashboardData>(cacheKey, fetcher, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
 
   const refetchStocks = useCallback(async () => {
     setStockLoading(true);
@@ -75,8 +60,10 @@ export function useDashboardData(period: string, segment: string, symbols: strin
   }, [symbols]);
 
   useEffect(() => {
-    refetchDashboard();
-  }, [period, segment, refetchDashboard]);
+    setDashboard(data ?? null);
+    setDashError(error ? "ダッシュボードデータの取得に失敗しました" : null);
+    setDashLoading(isLoading);
+  }, [data, error, isLoading]);
 
   useEffect(() => {
     refetchStocks();
@@ -86,7 +73,7 @@ export function useDashboardData(period: string, segment: string, symbols: strin
     dashboard,
     dashLoading,
     dashError,
-    refetchDashboard,
+    refetchDashboard: mutate,
     stockData,
     stockLoading,
     stockError,
