@@ -54,6 +54,15 @@ export default function ToolsPage() {
   });
   const { trigger: triggerToast, ToastSlot } = useMockAction();
   const { log } = useActionLogger();
+  const formatDate = (value: number) =>
+    new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -117,7 +126,7 @@ export default function ToolsPage() {
               <li key={item.path} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
                 <div>
                   <div>{item.label}</div>
-                  <div className="text-[11px] text-slate-400">最終更新: {new Date(item.at).toLocaleString("ja-JP")}</div>
+                  <div className="text-[11px] text-slate-400">最終更新: {formatDate(item.at)}</div>
                 </div>
                 <Link href={item.path} className="text-xs text-emerald-200 underline underline-offset-4">
                   再開

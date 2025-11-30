@@ -65,7 +65,15 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(`Failed to share (${res.status})`);
       const data = (await res.json()) as { url: string; expiresAt: string };
-      setShareMsg(`共有リンクを発行しました: ${data.url} （有効期限: ${new Date(data.expiresAt).toLocaleString("ja-JP")}）`);
+      const expiry = new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(data.expiresAt));
+      setShareMsg(`共有リンクを発行しました: ${data.url} （有効期限: ${expiry}）`);
     } catch (err) {
       console.error(err);
       setShareError("共有リンクの発行に失敗しました");
