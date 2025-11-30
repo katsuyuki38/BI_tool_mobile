@@ -146,13 +146,15 @@ export default function Home() {
               </button>
               <button
                 onClick={async () => {
-                  triggerMock("Slackにスナップショット（モック）を送信しました");
-                  await fetch("/api/notify/slack", {
+                  const res = await fetch("/api/notify/slack", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ path: "/" }),
                   });
-                  log({ action: "slack_snapshot", detail: { path: "/" } });
+                  const body = await res.json().catch(() => ({} as { message?: string }));
+                  const msg = body?.message ?? "Slackにスナップショット（モック）を送信しました";
+                  triggerMock(msg);
+                  log({ action: "slack_snapshot", detail: { path: "/", message: msg } });
                 }}
                 className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
               >
@@ -160,13 +162,18 @@ export default function Home() {
               </button>
               <button
                 onClick={async () => {
-                  triggerMock("CSVエクスポート（モック）を開始しました");
-                  await fetch("/api/export/csv", {
+                  const res = await fetch("/api/export/csv", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ period, segment }),
                   });
-                  log({ action: "csv_export", detail: { period, segment } });
+                  const body = (await res.json().catch(() => ({}))) as { filename?: string; message?: string };
+                  const msg =
+                    body?.message && body?.filename
+                      ? `${body.message} (${body.filename})`
+                      : "CSVエクスポート（モック）を開始しました";
+                  triggerMock(msg);
+                  log({ action: "csv_export", detail: { period, segment, filename: body?.filename } });
                 }}
                 className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-400/50 hover:text-emerald-100"
               >

@@ -138,14 +138,23 @@ export default function ToolsPage() {
               <button
                 key={action}
                 onClick={async () => {
-                  triggerToast(`${action}（モック）を実行しました`);
                   if (action.startsWith("Slack")) {
-                    await fetch("/api/notify/slack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: "/tools" }) });
-                    log({ action: "slack_snapshot", detail: { path: "/tools" } });
+                    const res = await fetch("/api/notify/slack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: "/tools" }) });
+                    const body = await res.json().catch(() => ({} as { message?: string }));
+                    const msg = body?.message ?? `${action}（モック）`;
+                    triggerToast(msg);
+                    log({ action: "slack_snapshot", detail: { path: "/tools", message: msg } });
                   } else if (action.startsWith("CSV")) {
-                    await fetch("/api/export/csv", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period: "30", segment: "all" }) });
-                    log({ action: "csv_export", detail: { period: "30", segment: "all" } });
+                    const res = await fetch("/api/export/csv", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period: "30", segment: "all" }) });
+                    const body = (await res.json().catch(() => ({}))) as { filename?: string; message?: string };
+                    const msg =
+                      body?.message && body?.filename
+                        ? `${body.message} (${body.filename})`
+                        : `${action}（モック）を実行しました`;
+                    triggerToast(msg);
+                    log({ action: "csv_export", detail: { period: "30", segment: "all", filename: body?.filename } });
                   } else {
+                    triggerToast(`${action}（モック）を実行しました`);
                     log({ action: "open_alert_settings" });
                   }
                 }}
